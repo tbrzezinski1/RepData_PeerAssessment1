@@ -1,25 +1,99 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible research - assignment1"
+output: html_document
 ---
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
+This document is created to report works on assignment 1 for course "Reproducible research"
 
 
 
-## What is the average daily activity pattern?
+###Loading packages and data (including records with NA)
+
+```{r}
+library(ggplot2)
+library(plyr)
+library(lattice)
+url<-"activity.csv"
+data0<-read.csv(url, header = TRUE, sep=",")
+head(data0)
+```
+
+###Removing NAs 
+
+```{r}
+dataValid<-data0[!is.na(data0$steps),]
+head(dataValid)
+```
+
+###Calculating the total number of steps taken by day
+```{r}
+StepsByDay<-ddply(dataValid,"date",summarise, SumOfSteps=sum(steps))
+hist(StepsByDay$SumOfSteps,20,main="Histogram of steps by day")
+
+```
+
+Basic statistics:
+```{r}
+summary(StepsByDay$SumOfSteps)
+```
+
+###Daily activity pattern
 
 
+```{r}
+StepsByInterval<-ddply(dataValid,"interval",summarise, AvgSteps=mean(steps))
+plot(StepsByInterval$interval, StepsByInterval$AvgSteps, type="l")
+```
 
-## Imputing missing values
+Finding interval with maximum average number of steps:
+```{r}
+maxInterval<-StepsByInterval$interval[StepsByInterval$AvgSteps==max(StepsByInterval$AvgSteps)]
+```
+
+Interval with maximum average number of steps: `r maxInterval`
+
+### Imputing missing values
+
+```{r}
+stepsNA<-nrow(data0[is.na(data0$steps),])
+dateNA<-nrow(data0[is.na(data0$date),])
+intervalNA<-nrow(data0[is.na(data0$interval),])
+```
+
+Number of NAs in the data set: `r stepsNA` for variable 'steps', `r dateNA` for variable 'date', `r intervalNA` for variable 'interval
+
+Only variable 'steps' needs any dealing with NAs.
+Missing values will be replaced with the average for the same interval.
+
+```{r}
+dataNAS<-data0[is.na(data0$steps),]
+dataNAS<-join(dataNAS,StepsByInterval)
+dataNAS$steps<-dataNAS$AvgSteps
+dataCleared<-join(dataNAS,dataValid, type="full")
+```
 
 
+Calculating the total number of steps taken by day - for imputed NAs
+```{r}
+StepsByDay2<-ddply(dataCleared,"date",summarise, SumOfSteps=sum(steps))
+hist(StepsByDay2$SumOfSteps,20,main="Histogram of steps by day")
 
-## Are there differences in activity patterns between weekdays and weekends?
+```
+
+Basic statistics:
+```{r}
+summary(StepsByDay2$SumOfSteps)
+```
+
+Only slight differences in distribution of 'steps' by interval, a bit more concentrated around dominant value
+
+### Differences in activity patterns between weekdays and weekends
+
+```{r}
+dataCleared$date<-as.Date(dataCleared$date)
+dataCleared$weekday<-weekdays(dataCleared$date, abbreviate = TRUE)
+dataCleared$weekday2<-"weekday"
+dataCleared$weekday2[dataCleared$weekday=="So"|dataCleared$weekday=="N"]<-"weekend"
+StepsByWeekday<-ddply(dataCleared,.(interval,weekday2),summarise, MeanOfSteps=mean(steps))
+xyplot(MeanOfSteps~interval|weekday2, data=StepsByWeekday, type="l", layout=c(1,2))
+```
